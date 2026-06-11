@@ -1,9 +1,8 @@
 # SonarQube LOC Dashboard
 
-An interactive Lines-of-Code history dashboard for SonarQube. Available in two forms:
+An interactive Lines-of-Code history dashboard for SonarQube:
 
 - **SonarQube Plugin (JAR)** — embedded directly in SonarQube as a page extension
-- **Standalone HTML + Node.js proxy** — runs outside SonarQube, useful for read-only access or demos
 
 ---
 
@@ -20,14 +19,13 @@ An interactive Lines-of-Code history dashboard for SonarQube. Available in two f
 
 ---
 
-## Option 1: SonarQube Plugin
+## Install
 
 ### Requirements
 
 - Java 11+
 - Maven 3.6+
 - SonarQube 9.x / 10.x / 2025.x / 2026.x (tested on 10.6, 2025.1.7, 2026.2.1)
-- Docker (for the deploy scripts)
 
 ### Build
 
@@ -39,55 +37,25 @@ mvn clean package
 
 ### Deploy
 
-**Windows (Docker):**
-```bat
-cd sonarqube-loc-dashboard
-deploy.bat
-```
-
-**Linux/macOS (Docker):**
+**Windows/Linux(Docker):**
 ```bash
-cd sonarqube-loc-dashboard
-./deploy.sh
+docker cp <JAR_file> <DOCKER_CONTAINER_NAME>:/opt/sonarqube/extensions/plugins/sonar-locdashboard-plugin-1.0.0.jar
+docker restart <DOCKER_CONTAINER_NAME>
+
 ```
 
-Both scripts build the JAR, copy it into the running SonarQube container, and restart it.
-Default container name is `sonarqube` — edit the script to change it.
+
+Build the JAR, copy it into the running SonarQube container, and restart it.
 
 Wait ~30 seconds after restart, then hard-refresh (`Ctrl+Shift+R`) the browser.
 
 The dashboard appears under **More > LOC Dashboard** in the SonarQube top nav.
 
-> **Note:** A hard refresh (`Ctrl+Shift+R`) is required after every deploy — SonarQube aggressively caches plugin static assets.
+> **Note:** A hard refresh (`Ctrl+Shift+R`) isn't always required, but it's helpful in deleting cached assets.
 
 ---
 
-## Option 2: Standalone HTML + Node.js Proxy
 
-No npm dependencies required — runs on the Node.js built-in `http` module.
-
-### Requirements
-
-- Node.js 14+
-- A running SonarQube instance (local or remote)
-
-### Start
-
-```bash
-node server.js
-# Open http://localhost:3000
-```
-
-Optional flags:
-
-| Flag / Env | Description |
-|---|---|
-| `PORT=8080 node server.js` | Change port (default 3000) |
-| `node server.js --insecure` | Disable TLS certificate verification |
-
-The dashboard will prompt for your SonarQube URL and a user token. The token only needs **Browse** permission on the projects you want to view.
-
----
 
 ## Project Structure
 
@@ -100,14 +68,9 @@ sonarqube-loc-dashboard/
     index.js                       Dashboard UI (all logic, no framework)
     chart.umd.min.js               Chart.js (bundled, no CDN)
     chartjs-adapter-date-fns.bundle.min.js
-    locdashboard/
-      index.html                   Local standalone testing only (not used by JAR)
   pom.xml
-  deploy.bat                       Windows Docker deploy
-  deploy.sh                        Linux/macOS Docker deploy
 
-server.js                          Node.js CORS proxy (standalone mode)
-sonarqube-dashboard.html           Standalone dashboard HTML
+
 ```
 
 ---
@@ -129,4 +92,3 @@ JSON and OpenAPI YAML files are **not** counted as LOC in any version — the Ia
 The entire dashboard UI lives in a single file: `src/main/resources/static/index.js`.
 It uses the SonarQube `window.registerExtension` IIFE pattern with no build step.
 
-After editing `index.js`, run `deploy.bat` / `deploy.sh` and hard-refresh the browser.
