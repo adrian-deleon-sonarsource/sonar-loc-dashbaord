@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LOC Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --accent: #6366f1;
+      --accent-h: #4f46e5;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 13px;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo {
+      width: 28px; height: 28px;
+      background: var(--accent); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 12px; flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 600; flex: 1; }
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 99px;
+      font-size: 11px; font-weight: 500;
+    }
+    .badge-ok  { background: rgba(16,185,129,0.15); color: #34d399; }
+    .badge-err { background: rgba(239,68,68,0.15);  color: #fca5a5; }
+
+    .page { max-width: 1440px; margin: 0 auto; padding: 20px 24px; }
+
+    /* Loading */
+    .loading-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+    .loading-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-bar { background: var(--bg); border-radius: 99px; height: 5px; overflow: hidden; }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #818cf8);
+      border-radius: 99px; transition: width 0.4s ease;
+    }
+    .load-text  { font-size: 12px; color: var(--muted); }
+    .load-count { font-size: 11px; color: var(--muted); margin-left: auto; }
+
+    /* Alert */
+    .alert {
+      padding: 12px 16px; border-radius: 6px;
+      font-size: 12px; line-height: 1.6;
+      margin-bottom: 16px;
+    }
+    .alert-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px; margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .stat-card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .stat-card .value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .stat-card .sub   { color: var(--muted); font-size: 11px; margin-top: 5px; }
+
+    /* Main grid */
+    .dash-grid { display: grid; grid-template-columns: 200px 1fr; gap: 14px; }
+
+    /* Sidebar */
+    .sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .filter-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .filter-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .filter-label  { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .filter-actions { display: flex; gap: 4px; }
+    .filter-list {
+      display: flex; flex-direction: column; gap: 1px;
+      max-height: 220px; overflow-y: auto;
+    }
+    .filter-list::-webkit-scrollbar { width: 3px; }
+    .filter-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .filter-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 6px; border-radius: 5px;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .filter-item:hover { background: var(--surface2); }
+    .filter-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .fi-name  { flex: 1; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .fi-count { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+    .lang-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Chart area */
+    .chart-area { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .chart-controls {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .tab-group {
+      display: flex;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; overflow: hidden;
+    }
+    .tab-btn {
+      padding: 6px 14px; border: none; background: transparent;
+      color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 500;
+      transition: all 0.15s;
+    }
+    .tab-btn.active { background: var(--accent); color: white; }
+    .date-range { display: flex; align-items: center; gap: 8px; }
+    .date-range span { color: var(--muted); font-size: 12px; }
+    .date-range input {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 5px; padding: 5px 10px;
+      color: var(--text); font-size: 12px; outline: none;
+    }
+    .date-range input:focus { border-color: var(--accent); }
+    .date-range input::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+    .chart-title { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      height: 440px;
+      display: flex; flex-direction: column;
+    }
+    .chart-card canvas { flex: 1; min-height: 0; }
+
+    .empty-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; color: var(--muted); gap: 10px;
+    }
+    .empty-state svg { opacity: 0.25; }
+    .empty-state p { font-size: 13px; }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 16px; border-radius: 6px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-ghost {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: rgba(226,232,240,0.3); }
+    .btn-xs { padding: 4px 8px; font-size: 11px; border-radius: 5px; }
+
+    /* Comparison project dropdown */
+    .comp-drop-wrap { position: relative; }
+    .comp-drop-trigger {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 6px; padding: 5px 10px;
+      color: var(--text); font-size: 12px; cursor: pointer;
+      min-width: 160px; justify-content: space-between;
+    }
+    .comp-drop-trigger:hover { border-color: var(--accent); }
+    .comp-drop-trigger.open  { border-color: var(--accent); }
+    .comp-drop-panel {
+      position: absolute; top: calc(100% + 4px); left: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px;
+      min-width: 220px; z-index: 100;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+    }
+    .comp-drop-actions {
+      display: flex; gap: 4px; margin-bottom: 8px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .comp-drop-list {
+      display: flex; flex-direction: column; gap: 1px;
+      max-height: 200px; overflow-y: auto;
+    }
+
+    .hidden { display: none !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 960px) {
+      .stats-grid  { grid-template-columns: repeat(2, 1fr); }
+      .dash-grid   { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SQ</div>
+  <h1>LOC Dashboard</h1>
+  <span id="statusBadge" class="badge"></span>
+  <button class="btn btn-ghost btn-xs" style="margin-left:8px;" onclick="reload()" title="Reload data">&#8635; Refresh</button>
+</header>
+
+<div class="page">
+
+  <!-- Loading -->
+  <div id="loadingCard" class="loading-card">
+    <div class="loading-row">
+      <div class="spinner"></div>
+      <span id="loadText" class="load-text">Fetching projects…</span>
+      <span id="loadCount" class="load-count"></span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Error -->
+  <div id="errAlert" class="alert alert-error hidden"></div>
+
+  <!-- Dashboard -->
+  <div id="dashboard" class="hidden">
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Total Lines of Code</div>
+        <div class="value" id="sTotalLoc">—</div>
+        <div class="sub"  id="sTotalLocSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Projects</div>
+        <div class="value" id="sProjects">—</div>
+        <div class="sub"  id="sProjectsSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Languages</div>
+        <div class="value" id="sLangs">—</div>
+        <div class="sub"  id="sLangsSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">History Span</div>
+        <div class="value" style="font-size:15px;line-height:1.4;" id="sDateRange">—</div>
+        <div class="sub" id="sDateSub"></div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+
+      <div class="sidebar">
+        <div class="filter-card">
+          <div class="filter-header">
+            <span class="filter-label">Projects</span>
+            <div class="filter-actions">
+              <button class="btn btn-ghost btn-xs" id="btnAllProj">All</button>
+              <button class="btn btn-ghost btn-xs" id="btnNoneProj">None</button>
+            </div>
+          </div>
+          <div class="filter-list" id="projFilter"></div>
+        </div>
+        <div class="filter-card">
+          <div class="filter-header">
+            <span class="filter-label">Languages</span>
+            <div class="filter-actions">
+              <button class="btn btn-ghost btn-xs" id="btnAllLang">All</button>
+              <button class="btn btn-ghost btn-xs" id="btnNoneLang">None</button>
+            </div>
+          </div>
+          <div class="filter-list" id="langFilter"></div>
+        </div>
+      </div>
+
+      <div class="chart-area">
+        <div class="chart-controls">
+          <div class="tab-group">
+            <button class="tab-btn active" data-view="timeline">Timeline</button>
+            <button class="tab-btn" data-view="distribution">By Language</button>
+            <button class="tab-btn" data-view="comparison">By Project</button>
+          </div>
+          <div id="compDropWrap" class="comp-drop-wrap hidden">
+            <button id="compDropTrigger" class="comp-drop-trigger">
+              <span id="compDropLabel">All projects</span>
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 1l4 4 4-4"/></svg>
+            </button>
+            <div id="compDropPanel" class="comp-drop-panel hidden">
+              <div class="comp-drop-actions">
+                <button class="btn btn-ghost btn-xs" id="compAllBtn">All</button>
+                <button class="btn btn-ghost btn-xs" id="compNoneBtn">None</button>
+              </div>
+              <div class="comp-drop-list" id="compDropList"></div>
+            </div>
+          </div>
+          <div class="date-range">
+            <span>From</span><input type="date" id="dateFrom" />
+            <span>To</span><input type="date" id="dateTo" />
+            <button class="btn btn-ghost btn-xs" onclick="resetDates()">Reset</button>
+          </div>
+          <span class="chart-title" id="chartTitle"></span>
+        </div>
+        <div class="chart-card">
+          <canvas id="mainChart"></canvas>
+          <div class="empty-state hidden" id="emptyState">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+              <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-4"/>
+            </svg>
+            <p>No data for the selected filters</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ─── Language colours ─────────────────────────────────────────────────────────
+const LANG_COLORS = {
+  java:'#b07219', cs:'#178600', js:'#f1e05a', ts:'#3178c6', py:'#3572A5',
+  go:'#00ADD8', rb:'#701516', php:'#4F5D95', cpp:'#f34b7d', c:'#555555',
+  html:'#e34c26', css:'#563d7c', xml:'#0060ac', swift:'#F05138',
+  kotlin:'#A97BFF', scala:'#c22d40', rs:'#dea584', dart:'#00B4AB',
+  vue:'#41b883', web:'#e8d44d', plsql:'#dad8d8', objc:'#438eff',
+  abap:'#E8274B', flex:'#cc6600', vbnet:'#945db7', vb6:'#945db7',
+  groovy:'#4298b8', lua:'#000080', apex:'#1797c0', cobol:'#005ca5',
+  r:'#198ce7', terraform:'#7b42bc', ps1:'#012456', sol:'#AA6746',
+  bash:'#89e051', yaml:'#cb171e', json:'#c8c8c8',
+};
+function langColor(lang, idx) {
+  const c = LANG_COLORS[(lang||'').toLowerCase()];
+  if (c) return c;
+  return `hsl(${(idx * 137.508) % 360},62%,55%)`;
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+const state = {
+  projects: [],
+  metricsData: {},     // projectKey -> [{date:Date, langs:{k:n}}]
+  allLangs: [],
+  selProjects: new Set(),
+  selLangs: new Set(),
+  compSelProjects: new Set(),
+  view: 'timeline',
+  dateFrom: null,
+  dateTo: null,
+};
+let chart = null;
+
+// ─── API — same-origin, session auth, no token needed ─────────────────────────
+async function apiFetch(path) {
+  const res = await fetch(path, { credentials: 'same-origin' });
+  if (res.status === 401) throw new Error('Session expired — please log into SonarQube and reload.');
+  if (res.status === 403) throw new Error('403 Forbidden — your account may lack Browse permissions.');
+  if (!res.ok) {
+    let msg = `HTTP ${res.status} ${res.statusText}`;
+    try { const j = await res.json(); msg += ': ' + (j.errors?.[0]?.msg || ''); } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function fetchAllProjects() {
+  const all = [];
+  let page = 1;
+  while (true) {
+    const data = await apiFetch(`/api/projects/search?ps=500&p=${page}`);
+    all.push(...data.components);
+    if (all.length >= data.paging.total) break;
+    page++;
+  }
+  return all;
+}
+
+async function fetchMetrics(projectKey) {
+  try {
+    const data = await apiFetch(
+      `/api/measures/search_history?component=${encodeURIComponent(projectKey)}&metrics=ncloc_language_distribution&ps=1000`
+    );
+    return (data.measures?.[0]?.history ?? [])
+      .filter(h => h.value)
+      .map(h => ({ date: new Date(h.date), langs: parseLangDist(h.value) }))
+      .sort((a, b) => a.date - b.date);
+  } catch {
+    return [];
+  }
+}
+
+function parseLangDist(value) {
+  const out = {};
+  for (const seg of value.split(';')) {
+    const eq = seg.indexOf('=');
+    if (eq === -1) continue;
+    const lang = seg.slice(0, eq).toLowerCase().trim();
+    const n = parseInt(seg.slice(eq + 1), 10);
+    if (lang && !isNaN(n)) out[lang] = n;
+  }
+  return out;
+}
+
+// ─── Load ─────────────────────────────────────────────────────────────────────
+async function load() {
+  showLoad(true);
+  clearErr();
+  document.getElementById('dashboard').classList.add('hidden');
+  setStatus('');
+  setProgress(0, 'Fetching project list…');
+
+  try {
+    const projects = await fetchAllProjects();
+    if (!projects.length) throw new Error('No projects found. Your account may not have Browse permissions on any project.');
+
+    state.projects = projects;
+    state.selProjects = new Set(projects.map(p => p.key));
+    state.compSelProjects = new Set(projects.map(p => p.key));
+
+    setProgress(5, `Found ${projects.length} project${projects.length !== 1 ? 's' : ''}. Fetching metrics…`);
+
+    const BATCH = 6;
+    state.metricsData = {};
+    for (let i = 0; i < projects.length; i += BATCH) {
+      const batch = projects.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(p => fetchMetrics(p.key)));
+      batch.forEach((p, j) => { state.metricsData[p.key] = results[j]; });
+      const done = Math.min(i + BATCH, projects.length);
+      setProgress(5 + (done / projects.length) * 90, `Fetched ${done} / ${projects.length} projects…`);
+      document.getElementById('loadCount').textContent = `${done} / ${projects.length}`;
+    }
+
+    const langSet = new Set();
+    Object.values(state.metricsData).forEach(h =>
+      h.forEach(pt => Object.keys(pt.langs).forEach(l => langSet.add(l)))
+    );
+    state.allLangs = [...langSet].sort();
+    state.selLangs  = new Set(state.allLangs);
+
+    resetDatesFromData();
+    setProgress(100, 'Done');
+    showLoad(false);
+
+    setStatus(`${projects.length} projects loaded`, true);
+    document.getElementById('dashboard').classList.remove('hidden');
+
+    renderProjFilter();
+    renderLangFilter();
+    renderCompDropdown();
+    updateStats();
+    renderChart();
+
+  } catch (err) {
+    showLoad(false);
+    showErr(err.message);
+    setStatus('Error', false);
+  }
+}
+
+function reload() { load(); }
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function showLoad(v)   { document.getElementById('loadingCard').classList.toggle('hidden', !v); }
+function setProgress(pct, txt) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  if (txt) document.getElementById('loadText').textContent = txt;
+}
+function showErr(msg) {
+  const el = document.getElementById('errAlert');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function clearErr() { document.getElementById('errAlert').classList.add('hidden'); }
+function setStatus(txt, ok) {
+  const el = document.getElementById('statusBadge');
+  el.textContent = txt;
+  el.className = 'badge ' + (txt ? (ok ? 'badge-ok' : 'badge-err') : '');
+}
+
+function fmtN(n) { return n == null ? '—' : Number(n).toLocaleString(); }
+function fmtK(n) {
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return Math.round(n/1e3) + 'K';
+  return n;
+}
+function fmtDate(d) { return d.toLocaleDateString('en-US', { year:'numeric', month:'short', day:'numeric' }); }
+function toInput(d) { return d.toISOString().slice(0,10); }
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+function renderProjFilter() {
+  const container = document.getElementById('projFilter');
+  container.innerHTML = '';
+  state.projects.forEach(p => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.selProjects.has(p.key);
+    cb.addEventListener('change', () => {
+      cb.checked ? state.selProjects.add(p.key) : state.selProjects.delete(p.key);
+      renderLangFilter(); updateStats(); renderChart();
+    });
+    const span = document.createElement('span');
+    span.className = 'fi-name';
+    span.textContent = p.name || p.key;
+    span.title = p.name || p.key;
+    label.appendChild(cb);
+    label.appendChild(span);
+    container.appendChild(label);
+  });
+}
+
+function renderLangFilter() {
+  const snap = getSnapshot();
+  const totals = {};
+  for (const langs of Object.values(snap))
+    for (const [l, n] of Object.entries(langs))
+      totals[l] = (totals[l] || 0) + n;
+
+  const container = document.getElementById('langFilter');
+  container.innerHTML = '';
+  state.allLangs.forEach((lang, idx) => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.selLangs.has(lang);
+    cb.addEventListener('change', () => {
+      cb.checked ? state.selLangs.add(lang) : state.selLangs.delete(lang);
+      renderChart();
+    });
+    const dot = document.createElement('span');
+    dot.className = 'lang-dot';
+    dot.style.background = langColor(lang, idx);
+    const name = document.createElement('span');
+    name.className = 'fi-name';
+    name.textContent = lang;
+    const count = document.createElement('span');
+    count.className = 'fi-count';
+    count.textContent = fmtK(totals[lang] || 0);
+    label.appendChild(cb); label.appendChild(dot);
+    label.appendChild(name); label.appendChild(count);
+    container.appendChild(label);
+  });
+}
+
+function selectAllProjects(all) {
+  state.selProjects = all ? new Set(state.projects.map(p => p.key)) : new Set();
+  renderProjFilter(); renderLangFilter(); updateStats(); renderChart();
+}
+function selectAllLangs(all) {
+  state.selLangs = all ? new Set(state.allLangs) : new Set();
+  renderLangFilter(); renderChart();
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+function getSnapshot(projSet = state.selProjects) {
+  const from = state.dateFrom, to = state.dateTo;
+  const result = {};
+  for (const key of projSet) {
+    const hist = state.metricsData[key] || [];
+    const inRange = hist.filter(p => (!from || p.date >= from) && (!to || p.date <= to));
+    const last = inRange.length ? inRange[inRange.length-1] : hist[hist.length-1];
+    if (last) result[key] = last.langs;
+  }
+  return result;
+}
+
+function getTimeSeries() {
+  const from = state.dateFrom, to = state.dateTo;
+  const tsSet = new Set();
+  for (const key of state.selProjects)
+    for (const pt of state.metricsData[key] || [])
+      if ((!from || pt.date >= from) && (!to || pt.date <= to))
+        tsSet.add(pt.date.getTime());
+
+  return [...tsSet].sort((a,b) => a-b).map(t => {
+    const langs = {};
+    for (const key of state.selProjects) {
+      const hist = state.metricsData[key] || [];
+      let entry = null;
+      for (let i = hist.length-1; i >= 0; i--)
+        if (hist[i].date.getTime() <= t) { entry = hist[i]; break; }
+      if (entry)
+        for (const [l,n] of Object.entries(entry.langs))
+          langs[l] = (langs[l]||0) + n;
+    }
+    return { date: new Date(t), langs };
+  });
+}
+
+function activeLangs() { return state.allLangs.filter(l => state.selLangs.has(l)); }
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const snap = getSnapshot();
+  const totals = {};
+  for (const langs of Object.values(snap))
+    for (const [l,n] of Object.entries(langs))
+      totals[l] = (totals[l]||0) + n;
+
+  const total = Object.values(totals).reduce((s,n) => s+n, 0);
+  const projN = Object.keys(snap).length;
+  const langN = Object.keys(totals).length;
+
+  document.getElementById('sTotalLoc').textContent = fmtN(total);
+  document.getElementById('sTotalLocSub').textContent = `across ${projN} project${projN!==1?'s':''}`;
+  document.getElementById('sProjects').textContent = projN;
+  document.getElementById('sProjectsSub').textContent = `of ${state.projects.length} total`;
+  document.getElementById('sLangs').textContent = langN;
+  document.getElementById('sLangsSub').textContent = 'in latest snapshot';
+
+  const dates = Object.values(state.metricsData).flatMap(h => h.map(p => p.date));
+  if (dates.length) {
+    const min = new Date(Math.min(...dates));
+    const max = new Date(Math.max(...dates));
+    document.getElementById('sDateRange').textContent = fmtDate(min) + ' – ' + fmtDate(max);
+    document.getElementById('sDateSub').textContent = `${Math.round((max-min)/864e5)} days of history`;
+  }
+}
+
+// ─── Chart ────────────────────────────────────────────────────────────────────
+const AXIS = {
+  grid: { color: 'rgba(46,50,72,0.8)' },
+  ticks: { color: '#8892a4' },
+};
+const LEGEND = {
+  position: 'top',
+  labels: { color:'#e2e8f0', usePointStyle:true, pointStyleWidth:10, padding:14, font:{size:12} }
+};
+
+function initTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.view = btn.dataset.view;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('compDropWrap').classList.toggle('hidden', state.view !== 'comparison');
+      renderChart();
+    });
+  });
+  document.getElementById('dateFrom').addEventListener('change', applyDates);
+  document.getElementById('dateTo').addEventListener('change', applyDates);
+
+  document.getElementById('btnAllProj').addEventListener('click',  () => selectAllProjects(true));
+  document.getElementById('btnNoneProj').addEventListener('click', () => selectAllProjects(false));
+  document.getElementById('btnAllLang').addEventListener('click',  () => selectAllLangs(true));
+  document.getElementById('btnNoneLang').addEventListener('click', () => selectAllLangs(false));
+
+  const trigger = document.getElementById('compDropTrigger');
+  const panel   = document.getElementById('compDropPanel');
+  trigger.addEventListener('click', e => {
+    e.stopPropagation();
+    const open = !panel.classList.contains('hidden');
+    panel.classList.toggle('hidden', open);
+    trigger.classList.toggle('open', !open);
+  });
+  document.addEventListener('click', () => {
+    panel.classList.add('hidden');
+    trigger.classList.remove('open');
+  });
+  panel.addEventListener('click', e => e.stopPropagation());
+
+  document.getElementById('compAllBtn').addEventListener('click', () => {
+    state.compSelProjects = new Set(state.projects.map(p => p.key));
+    renderCompDropdown(); renderChart();
+  });
+  document.getElementById('compNoneBtn').addEventListener('click', () => {
+    state.compSelProjects = new Set();
+    renderCompDropdown(); renderChart();
+  });
+}
+
+function renderCompDropdown() {
+  const list = document.getElementById('compDropList');
+  list.innerHTML = '';
+  state.projects.forEach(p => {
+    const item = document.createElement('label');
+    item.className = 'filter-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.compSelProjects.has(p.key);
+    cb.addEventListener('change', () => {
+      cb.checked ? state.compSelProjects.add(p.key) : state.compSelProjects.delete(p.key);
+      updateCompLabel(); renderChart();
+    });
+    const span = document.createElement('span');
+    span.className = 'fi-name';
+    span.textContent = p.name || p.key;
+    span.title = p.name || p.key;
+    span.addEventListener('click', e => {
+      e.preventDefault();
+      state.compSelProjects = new Set([p.key]);
+      renderCompDropdown(); renderChart();
+    });
+    item.appendChild(cb);
+    item.appendChild(span);
+    list.appendChild(item);
+  });
+  updateCompLabel();
+}
+
+function updateCompLabel() {
+  const total = state.projects.length;
+  const sel   = state.compSelProjects.size;
+  const el    = document.getElementById('compDropLabel');
+  if (sel === 0)         el.textContent = 'No projects';
+  else if (sel === total) el.textContent = 'All projects';
+  else if (sel === 1) {
+    const key = [...state.compSelProjects][0];
+    const p   = state.projects.find(x => x.key === key);
+    const name = p?.name || key;
+    el.textContent = name.length > 20 ? name.slice(0, 18) + '…' : name;
+  } else {
+    el.textContent = `${sel} of ${total} projects`;
+  }
+}
+
+function applyDates() {
+  const f = document.getElementById('dateFrom').value;
+  const t = document.getElementById('dateTo').value;
+  state.dateFrom = f ? new Date(f + 'T00:00:00') : null;
+  state.dateTo   = t ? new Date(t + 'T23:59:59') : null;
+  updateStats(); renderLangFilter(); renderChart();
+}
+
+function resetDatesFromData() {
+  const dates = Object.values(state.metricsData).flatMap(h => h.map(p => p.date));
+  if (!dates.length) return;
+  const min = new Date(Math.min(...dates));
+  const max = new Date(Math.max(...dates));
+  state.dateFrom = min; state.dateTo = max;
+  document.getElementById('dateFrom').value = toInput(min);
+  document.getElementById('dateTo').value   = toInput(max);
+}
+
+function resetDates() { resetDatesFromData(); updateStats(); renderLangFilter(); renderChart(); }
+
+function mkChart(config) {
+  if (chart) chart.destroy();
+  document.getElementById('mainChart').classList.remove('hidden');
+  document.getElementById('emptyState').classList.add('hidden');
+  chart = new Chart(document.getElementById('mainChart').getContext('2d'), config);
+}
+function showEmpty() {
+  if (chart) { chart.destroy(); chart = null; }
+  document.getElementById('mainChart').classList.add('hidden');
+  document.getElementById('emptyState').classList.remove('hidden');
+}
+
+function renderChart() {
+  const langs = activeLangs();
+  if (!langs.length) { showEmpty(); return; }
+  if (state.view === 'comparison') {
+    if (!state.compSelProjects.size) { showEmpty(); return; }
+    renderComparison(langs);
+  } else {
+    if (!state.selProjects.size) { showEmpty(); return; }
+    if (state.view === 'timeline') renderTimeline(langs);
+    else renderDistribution(langs);
+  }
+}
+
+function guessUnit(series) {
+  if (series.length < 2) return 'month';
+  const days = (series[series.length-1].date - series[0].date) / 864e5;
+  return days < 45 ? 'day' : days < 600 ? 'month' : 'year';
+}
+
+function renderTimeline(langs) {
+  const series = getTimeSeries();
+  if (!series.length) { showEmpty(); return; }
+
+  const datasets = langs.map((lang, idx) => {
+    const color = langColor(lang, idx);
+    return {
+      label: lang,
+      data: series.map(pt => ({ x: pt.date, y: pt.langs[lang] || 0 })),
+      backgroundColor: color + 'a0',
+      borderColor: color,
+      borderWidth: 1.5,
+      fill: true, tension: 0.35,
+      pointRadius: series.length > 80 ? 0 : 3,
+      pointHoverRadius: 5,
+    };
+  });
+
+  const lastTotals = langs.reduce((s, l) => s + (series[series.length-1]?.langs[l]||0), 0);
+  document.getElementById('chartTitle').textContent =
+    `Latest total: ${fmtN(lastTotals)} LOC across ${state.selProjects.size} project${state.selProjects.size!==1?'s':''}`;
+
+  mkChart({
+    type: 'line', data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      scales: {
+        x: { type:'time', time:{ unit: guessUnit(series) }, ...AXIS, ticks:{ ...AXIS.ticks, maxTicksLimit:8 } },
+        y: { stacked:true, ...AXIS, ticks:{ ...AXIS.ticks, callback:fmtK },
+             title:{ display:true, text:'Lines of Code', color:'#8892a4', font:{size:11} } }
+      },
+      plugins: {
+        legend: LEGEND,
+        tooltip: { callbacks: {
+          label: ctx => `  ${ctx.dataset.label}: ${fmtN(ctx.raw.y)}`,
+          footer: items => `  Total: ${fmtN(items.reduce((s,i) => s+i.raw.y, 0))}`,
+        }}
+      }
+    }
+  });
+}
+
+function renderDistribution(langs) {
+  const snap = getSnapshot();
+  const totals = {};
+  for (const projLangs of Object.values(snap))
+    for (const [l,n] of Object.entries(projLangs))
+      if (langs.includes(l)) totals[l] = (totals[l]||0) + n;
+
+  const sorted = langs.filter(l => totals[l]).sort((a,b) => totals[b]-totals[a]);
+  if (!sorted.length) { showEmpty(); return; }
+
+  const total = sorted.reduce((s,l) => s+totals[l], 0);
+  document.getElementById('chartTitle').textContent = `Total: ${fmtN(total)} LOC`;
+
+  mkChart({
+    type: 'bar',
+    data: {
+      labels: sorted,
+      datasets: [{
+        label: 'Lines of Code',
+        data: sorted.map(l => totals[l]),
+        backgroundColor: sorted.map((l,i) => langColor(l,i) + 'bb'),
+        borderColor:     sorted.map((l,i) => langColor(l,i)),
+        borderWidth: 1.5, borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display:false },
+        tooltip: { callbacks: {
+          label: ctx => `  ${fmtN(ctx.raw)} LOC`,
+          afterLabel: ctx => `  ${((ctx.raw/total)*100).toFixed(1)}% of total`,
+        }}
+      },
+      scales: {
+        x: { ...AXIS },
+        y: { ...AXIS, ticks:{ ...AXIS.ticks, callback:fmtK },
+             title:{ display:true, text:'Lines of Code', color:'#8892a4', font:{size:11} } }
+      }
+    }
+  });
+}
+
+function renderComparison(langs) {
+  const snap = getSnapshot(state.compSelProjects);
+  const projKeys = [...state.compSelProjects].filter(k => snap[k]);
+  if (!projKeys.length) { showEmpty(); return; }
+
+  const projNames = projKeys.map(k => {
+    const found = state.projects.find(p => p.key === k);
+    const n = found?.name || k;
+    return n.length > 22 ? n.slice(0,20) + '…' : n;
+  });
+
+  const datasets = langs.map((lang, idx) => ({
+    label: lang,
+    data: projKeys.map(k => snap[k]?.[lang] || 0),
+    backgroundColor: langColor(lang, idx) + 'bb',
+    borderColor:     langColor(lang, idx),
+    borderWidth: 1.5, borderRadius: 3,
+  }));
+
+  document.getElementById('chartTitle').textContent =
+    `${projKeys.length} project${projKeys.length!==1?'s':''} compared`;
+
+  mkChart({
+    type: 'bar', data: { labels: projNames, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode:'index', intersect:false },
+      scales: {
+        x: { stacked:true, ...AXIS, ticks:{ ...AXIS.ticks, maxRotation:40 } },
+        y: { stacked:true, ...AXIS, ticks:{ ...AXIS.ticks, callback:fmtK },
+             title:{ display:true, text:'Lines of Code', color:'#8892a4', font:{size:11} } }
+      },
+      plugins: {
+        legend: LEGEND,
+        tooltip: { callbacks: {
+          label: ctx => `  ${ctx.dataset.label}: ${fmtN(ctx.raw)}`,
+          footer: items => `  Total: ${fmtN(items.reduce((s,i) => s+i.raw, 0))}`,
+        }}
+      }
+    }
+  });
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+initTabs();
+load();
+</script>
+</body>
+</html>

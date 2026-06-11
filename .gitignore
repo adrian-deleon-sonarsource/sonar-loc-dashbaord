@@ -1,0 +1,32 @@
+# Deploy scripts for SQS
+sonarqube-loc-dashboard/deploy.bat
+sonarqube-loc-dashboard/deploy.sh
+
+# Maven build output
+sonarqube-loc-dashboard/target/
+
+# Claude session files
+.claude/
+CONTEXT.md
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.suo
+*.user
+
+# Node (standalone proxy)
+node_modules/
+npm-debug.log*
+
+# Env / secrets
+.env
+*.env.local
+
+# Ignore CSS assets
+.assets/

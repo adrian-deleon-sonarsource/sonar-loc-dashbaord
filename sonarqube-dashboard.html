@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SonarQube LOC Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3248;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --accent: #6366f1;
+      --accent-h: #4f46e5;
+      --green: #10b981;
+      --red: #ef4444;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 13px;
+    }
+
+    /* Header */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .logo {
+      width: 30px; height: 30px;
+      background: var(--accent);
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 12px; letter-spacing: -0.5px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 600; flex: 1; }
+    .badge {
+      display: inline-flex; align-items: center;
+      padding: 3px 10px; border-radius: 99px;
+      font-size: 11px; font-weight: 500;
+    }
+    .badge-connected { background: rgba(16,185,129,0.15); color: #34d399; }
+    .badge-accent { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+
+    /* Layout */
+    .page { max-width: 1440px; margin: 0 auto; padding: 20px 24px; }
+
+    /* Config Card */
+    .config-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 14px;
+    }
+    .config-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 2fr auto;
+      gap: 12px;
+      align-items: end;
+    }
+    .field label {
+      display: block;
+      font-size: 11px; font-weight: 500;
+      color: var(--muted);
+      margin-bottom: 5px;
+    }
+    .field input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: var(--accent); }
+    .field input::placeholder { color: var(--muted); opacity: 0.6; }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 16px;
+      border-radius: 6px; border: none;
+      cursor: pointer; font-size: 13px; font-weight: 500;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-h); }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: rgba(226,232,240,0.3); }
+    .btn-xs { padding: 4px 8px; font-size: 11px; border-radius: 5px; }
+
+    /* Alert */
+    .alert {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      margin-top: 12px;
+    }
+    .alert-info { background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.25); color: #a5b4fc; }
+    .alert-error { background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; }
+
+    /* Loading */
+    .loading-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+    .loading-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+    .spinner {
+      width: 14px; height: 14px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-bar {
+      background: var(--bg);
+      border-radius: 99px;
+      height: 5px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #818cf8);
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+
+    /* Stats */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+    .stat-card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+    .stat-card .value { font-size: 26px; font-weight: 700; line-height: 1; }
+    .stat-card .sub { color: var(--muted); font-size: 11px; margin-top: 5px; }
+
+    /* Dashboard grid */
+    .dash-grid { display: grid; grid-template-columns: 200px 1fr; gap: 14px; }
+
+    /* Sidebar */
+    .sidebar { display: flex; flex-direction: column; gap: 12px; }
+    .filter-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+    }
+    .filter-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .filter-header-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+    .filter-header-actions { display: flex; gap: 4px; }
+    .filter-list {
+      display: flex; flex-direction: column; gap: 1px;
+      max-height: 220px; overflow-y: auto;
+    }
+    .filter-list::-webkit-scrollbar { width: 3px; }
+    .filter-list::-webkit-scrollbar-track { background: transparent; }
+    .filter-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .filter-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 6px; border-radius: 5px;
+      cursor: pointer; transition: background 0.1s;
+    }
+    .filter-item:hover { background: var(--surface2); }
+    .filter-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; flex-shrink: 0; }
+    .filter-item .fi-label {
+      flex: 1; font-size: 12px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .filter-item .fi-count { color: var(--muted); font-size: 11px; flex-shrink: 0; }
+    .lang-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Chart area */
+    .chart-area { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+    .chart-controls {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    }
+    .tab-group {
+      display: flex;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px; overflow: hidden;
+    }
+    .tab-btn {
+      padding: 6px 14px; border: none; background: transparent;
+      color: var(--muted); cursor: pointer; font-size: 12px; font-weight: 500;
+      transition: all 0.15s;
+    }
+    .tab-btn.active { background: var(--accent); color: white; }
+    .date-range { display: flex; align-items: center; gap: 8px; }
+    .date-range span { color: var(--muted); font-size: 12px; }
+    .date-range input {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 5px; padding: 5px 10px;
+      color: var(--text); font-size: 12px; outline: none;
+    }
+    .date-range input:focus { border-color: var(--accent); }
+    .date-range input::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+    .chart-title { font-size: 12px; color: var(--muted); margin-left: auto; }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative;
+      height: 440px;
+      display: flex; flex-direction: column;
+    }
+    .chart-card canvas { flex: 1; min-height: 0; }
+
+    /* Empty */
+    .empty-state {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; color: var(--muted); gap: 10px;
+    }
+    .empty-state svg { opacity: 0.25; }
+    .empty-state p { font-size: 13px; }
+
+    /* Utilities */
+    .hidden { display: none !important; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 960px) {
+      .config-grid { grid-template-columns: 1fr 1fr; }
+      .stats-grid { grid-template-columns: repeat(2, 1fr); }
+      .dash-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">SQ</div>
+  <h1>SonarQube LOC Dashboard</h1>
+  <span id="connBadge" class="badge badge-connected hidden">&#x2022; Connected</span>
+</header>
+
+<div class="page">
+
+  <!-- Connection config -->
+  <div class="config-card">
+    <div class="section-label">Connection</div>
+    <div class="config-grid">
+      <div class="field">
+        <label>Server URL</label>
+        <input type="text" id="cfgUrl" placeholder="https://sonarqube.company.com" />
+      </div>
+      <div class="field">
+        <label>Organization <em style="font-style:normal;opacity:0.5;">(optional)</em></label>
+        <input type="text" id="cfgOrg" placeholder="my-org" />
+      </div>
+      <div class="field">
+        <label>Auth Token <em style="font-style:normal;opacity:0.5;">(optional)</em></label>
+        <input type="password" id="cfgToken" placeholder="squ_..." />
+      </div>
+      <div class="field">
+        <button class="btn btn-primary" id="connectBtn" onclick="connect()">Load Projects</button>
+      </div>
+    </div>
+    <div id="corsHint" class="alert alert-info hidden">
+      <strong>Proxy not reachable —</strong> Make sure the Node.js proxy server is running:<br>
+      <code style="display:block;margin:6px 0 4px;padding:5px 10px;background:rgba(0,0,0,0.35);border-radius:4px;font-size:12px;">node server.js</code>
+      Then open <strong>http://localhost:3000</strong> in your browser — do not open the HTML file directly.
+      If your SonarQube uses a self-signed certificate, run <code>node server.js --insecure</code> instead.
+    </div>
+    <div id="errAlert" class="alert alert-error hidden"></div>
+  </div>
+
+  <!-- Loading progress -->
+  <div id="loadingCard" class="loading-card hidden">
+    <div class="loading-row">
+      <div class="spinner"></div>
+      <span id="loadText" style="font-size:12px;color:var(--muted);">Fetching projects…</span>
+      <span id="loadCount" style="font-size:11px;color:var(--muted);margin-left:auto;"></span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Dashboard (hidden until loaded) -->
+  <div id="dashboard" class="hidden">
+
+    <!-- Stats row -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Total Lines of Code</div>
+        <div class="value" id="sTotalLoc">—</div>
+        <div class="sub" id="sTotalLocSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Projects</div>
+        <div class="value" id="sProjects">—</div>
+        <div class="sub" id="sProjectsSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Languages</div>
+        <div class="value" id="sLangs">—</div>
+        <div class="sub" id="sLangsSub"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">History Span</div>
+        <div class="value" style="font-size:15px;line-height:1.4;" id="sDateRange">—</div>
+        <div class="sub" id="sDateSub"></div>
+      </div>
+    </div>
+
+    <!-- Sidebar + chart -->
+    <div class="dash-grid">
+
+      <!-- Filters sidebar -->
+      <div class="sidebar">
+        <div class="filter-card">
+          <div class="filter-header">
+            <span class="filter-header-label">Projects</span>
+            <div class="filter-header-actions">
+              <button class="btn btn-ghost btn-xs" onclick="selectAllProjects(true)">All</button>
+              <button class="btn btn-ghost btn-xs" onclick="selectAllProjects(false)">None</button>
+            </div>
+          </div>
+          <div class="filter-list" id="projFilter"></div>
+        </div>
+        <div class="filter-card">
+          <div class="filter-header">
+            <span class="filter-header-label">Languages</span>
+            <div class="filter-header-actions">
+              <button class="btn btn-ghost btn-xs" onclick="selectAllLangs(true)">All</button>
+              <button class="btn btn-ghost btn-xs" onclick="selectAllLangs(false)">None</button>
+            </div>
+          </div>
+          <div class="filter-list" id="langFilter"></div>
+        </div>
+      </div>
+
+      <!-- Chart panel -->
+      <div class="chart-area">
+        <div class="chart-controls">
+          <div class="tab-group">
+            <button class="tab-btn active" data-view="timeline">Timeline</button>
+            <button class="tab-btn" data-view="distribution">By Language</button>
+            <button class="tab-btn" data-view="comparison">By Project</button>
+          </div>
+          <div class="date-range">
+            <span>From</span>
+            <input type="date" id="dateFrom" />
+            <span>To</span>
+            <input type="date" id="dateTo" />
+            <button class="btn btn-ghost btn-xs" onclick="resetDates()">Reset</button>
+          </div>
+          <span class="chart-title" id="chartTitle"></span>
+        </div>
+        <div class="chart-card">
+          <canvas id="mainChart"></canvas>
+          <div class="empty-state hidden" id="emptyState">
+            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+              <path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-4"/>
+            </svg>
+            <p>No data for the selected filters</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ─── Language color palette ───────────────────────────────────────────────────
+const LANG_COLORS = {
+  java:'#b07219', cs:'#178600', js:'#f1e05a', ts:'#3178c6', py:'#3572A5',
+  go:'#00ADD8', rb:'#701516', php:'#4F5D95', cpp:'#f34b7d', c:'#555555',
+  html:'#e34c26', css:'#563d7c', xml:'#0060ac', swift:'#F05138',
+  kotlin:'#A97BFF', scala:'#c22d40', rs:'#dea584', dart:'#00B4AB',
+  vue:'#41b883', web:'#e8d44d', plsql:'#dad8d8', objc:'#438eff',
+  abap:'#E8274B', flex:'#cc6600', vbnet:'#945db7', vb6:'#945db7',
+  groovy:'#4298b8', lua:'#000080', apex:'#1797c0', cobol:'#005ca5',
+  r:'#198ce7', terraform:'#7b42bc', ps1:'#012456', sol:'#AA6746',
+  bash:'#89e051', yaml:'#cb171e', json:'#c8c8c8',
+};
+
+function langColor(lang, idx) {
+  const key = (lang || '').toLowerCase();
+  if (LANG_COLORS[key]) return LANG_COLORS[key];
+  const hue = (idx * 137.508) % 360;
+  return `hsl(${hue},62%,55%)`;
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+const state = {
+  projects: [],           // [{key, name}]
+  metricsData: {},        // projectKey -> [{date:Date, langs:{lang:n}}]
+  allLangs: [],           // sorted
+  selProjects: new Set(),
+  selLangs: new Set(),
+  view: 'timeline',       // timeline | distribution | comparison
+  dateFrom: null,
+  dateTo: null,
+};
+let chart = null;
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+function cfg() {
+  return {
+    url: document.getElementById('cfgUrl').value.replace(/\/+$/, ''),
+    org:  document.getElementById('cfgOrg').value.trim(),
+    tok:  document.getElementById('cfgToken').value.trim(),
+  };
+}
+
+async function apiFetch(path, { skipAuth = false } = {}) {
+  const { url, tok } = cfg();
+  const headers = { Accept: 'application/json', 'X-Sonar-Url': url };
+  if (tok && !skipAuth) headers['X-Sonar-Token'] = tok;
+
+  let res;
+  try {
+    res = await fetch('/proxy' + path, { headers });
+  } catch (netErr) {
+    throw new Error('Network error — make sure the proxy server is running: node server.js');
+  }
+
+  if (res.status === 405) {
+    throw new Error('405 Method Not Allowed — check your SonarQube URL and token.');
+  }
+  if (res.status === 401) throw new Error('401 Unauthorized — check your auth token.');
+  if (res.status === 403) throw new Error('403 Forbidden — token lacks required permissions.');
+  if (!res.ok) {
+    let msg = `HTTP ${res.status} ${res.statusText}`;
+    try { const j = await res.json(); msg += ': ' + (j.errors?.[0]?.msg || JSON.stringify(j)); } catch {}
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+async function fetchAllProjects() {
+  const { org } = cfg();
+  const all = [];
+  let page = 1;
+
+  while (true) {
+    let path = `/api/projects/search?ps=500&p=${page}`;
+    if (org) path += `&organization=${encodeURIComponent(org)}`;
+    const data = await apiFetch(path);
+    all.push(...data.components);
+    if (all.length >= data.paging.total) break;
+    page++;
+  }
+  return all;
+}
+
+async function fetchMetrics(projectKey) {
+  try {
+    const data = await apiFetch(
+      `/api/measures/search_history?component=${encodeURIComponent(projectKey)}&metrics=ncloc_language_distribution&ps=1000`
+    );
+    const history = data.measures?.[0]?.history ?? [];
+    return history
+      .filter(h => h.value)
+      .map(h => ({ date: new Date(h.date), langs: parseLangDist(h.value) }))
+      .sort((a, b) => a.date - b.date);
+  } catch {
+    return [];
+  }
+}
+
+function parseLangDist(value) {
+  const out = {};
+  for (const seg of value.split(';')) {
+    const eq = seg.indexOf('=');
+    if (eq === -1) continue;
+    const lang = seg.slice(0, eq).toLowerCase().trim();
+    const n = parseInt(seg.slice(eq + 1), 10);
+    if (lang && !isNaN(n)) out[lang] = n;
+  }
+  return out;
+}
+
+// ─── Connect / Load data ──────────────────────────────────────────────────────
+async function connect() {
+  const btn = document.getElementById('connectBtn');
+  if (!cfg().url) { showErr('Please enter a Server URL.'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  clearErr();
+  showLoad(true);
+  setProgress(0, 'Fetching project list…');
+
+  try {
+    const projects = await fetchAllProjects();
+    if (!projects.length) throw new Error('No projects found — check the URL and token.');
+
+    state.projects = projects;
+    state.selProjects = new Set(projects.map(p => p.key));
+
+    setProgress(5, `Found ${projects.length} project${projects.length !== 1 ? 's' : ''}. Fetching metrics…`);
+
+    // Fetch metrics in batches to avoid hammering the server
+    const BATCH = 6;
+    state.metricsData = {};
+    for (let i = 0; i < projects.length; i += BATCH) {
+      const batch = projects.slice(i, i + BATCH);
+      const results = await Promise.all(batch.map(p => fetchMetrics(p.key)));
+      batch.forEach((p, j) => { state.metricsData[p.key] = results[j]; });
+      const done = Math.min(i + BATCH, projects.length);
+      setProgress(5 + (done / projects.length) * 90,
+        `Fetched ${done} / ${projects.length} projects…`);
+      document.getElementById('loadCount').textContent = `${done} / ${projects.length}`;
+    }
+
+    // Collect language universe
+    const langSet = new Set();
+    Object.values(state.metricsData).forEach(h =>
+      h.forEach(pt => Object.keys(pt.langs).forEach(l => langSet.add(l)))
+    );
+    state.allLangs = [...langSet].sort();
+    state.selLangs = new Set(state.allLangs);
+
+    // Set date range from data
+    resetDatesFromData();
+
+    setProgress(100, 'Done');
+    showLoad(false);
+
+    document.getElementById('connBadge').classList.remove('hidden');
+    document.getElementById('dashboard').classList.remove('hidden');
+
+    renderProjFilter();
+    renderLangFilter();
+    updateStats();
+    renderChart();
+
+  } catch (err) {
+    showErr(err.message);
+    document.getElementById('corsHint').classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Load Projects';
+    showLoad(false);
+  }
+}
+
+// ─── UI helpers ───────────────────────────────────────────────────────────────
+function showLoad(v) { document.getElementById('loadingCard').classList.toggle('hidden', !v); }
+function setProgress(pct, txt) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  if (txt) document.getElementById('loadText').textContent = txt;
+}
+function showErr(msg) {
+  const el = document.getElementById('errAlert');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+}
+function clearErr() { document.getElementById('errAlert').classList.add('hidden'); }
+
+function fmtN(n) { return n == null ? '—' : Number(n).toLocaleString(); }
+function fmtK(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return Math.round(n / 1e3) + 'K';
+  return n;
+}
+function fmtDate(d) { return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); }
+function toInput(d) { return d.toISOString().slice(0, 10); }
+
+// ─── Filters ──────────────────────────────────────────────────────────────────
+function renderProjFilter() {
+  const container = document.getElementById('projFilter');
+  container.innerHTML = '';
+  state.projects.forEach(p => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.selProjects.has(p.key);
+    cb.addEventListener('change', () => {
+      cb.checked ? state.selProjects.add(p.key) : state.selProjects.delete(p.key);
+      renderLangFilter();
+      updateStats();
+      renderChart();
+    });
+    const span = document.createElement('span');
+    span.className = 'fi-label';
+    span.textContent = p.name || p.key;
+    span.title = p.name || p.key;
+    label.appendChild(cb);
+    label.appendChild(span);
+    container.appendChild(label);
+  });
+}
+
+function renderLangFilter() {
+  const snap = getSnapshot();
+  const totals = {};
+  for (const langs of Object.values(snap))
+    for (const [l, n] of Object.entries(langs))
+      totals[l] = (totals[l] || 0) + n;
+
+  const container = document.getElementById('langFilter');
+  container.innerHTML = '';
+  state.allLangs.forEach((lang, idx) => {
+    const label = document.createElement('label');
+    label.className = 'filter-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = state.selLangs.has(lang);
+    cb.addEventListener('change', () => {
+      cb.checked ? state.selLangs.add(lang) : state.selLangs.delete(lang);
+      renderChart();
+    });
+
+    const dot = document.createElement('span');
+    dot.className = 'lang-dot';
+    dot.style.background = langColor(lang, idx);
+
+    const name = document.createElement('span');
+    name.className = 'fi-label';
+    name.textContent = lang;
+
+    const count = document.createElement('span');
+    count.className = 'fi-count';
+    count.textContent = fmtK(totals[lang] || 0);
+
+    label.appendChild(cb);
+    label.appendChild(dot);
+    label.appendChild(name);
+    label.appendChild(count);
+    container.appendChild(label);
+  });
+}
+
+function selectAllProjects(all) {
+  state.selProjects = all ? new Set(state.projects.map(p => p.key)) : new Set();
+  renderProjFilter();
+  renderLangFilter();
+  updateStats();
+  renderChart();
+}
+
+function selectAllLangs(all) {
+  state.selLangs = all ? new Set(state.allLangs) : new Set();
+  renderLangFilter();
+  renderChart();
+}
+
+// ─── Data aggregation ─────────────────────────────────────────────────────────
+
+// Latest snapshot per project within date range: { key: {lang: n} }
+function getSnapshot() {
+  const from = state.dateFrom, to = state.dateTo;
+  const result = {};
+  for (const key of state.selProjects) {
+    const hist = state.metricsData[key] || [];
+    const inRange = hist.filter(p => (!from || p.date >= from) && (!to || p.date <= to));
+    const last = inRange.length ? inRange[inRange.length - 1] : hist[hist.length - 1];
+    if (last) result[key] = last.langs;
+  }
+  return result;
+}
+
+// Aggregated time series across selected projects
+function getTimeSeries() {
+  const from = state.dateFrom, to = state.dateTo;
+
+  // Collect all relevant timestamps
+  const tsSet = new Set();
+  for (const key of state.selProjects) {
+    for (const pt of state.metricsData[key] || []) {
+      if ((!from || pt.date >= from) && (!to || pt.date <= to))
+        tsSet.add(pt.date.getTime());
+    }
+  }
+
+  return [...tsSet].sort((a, b) => a - b).map(t => {
+    const langs = {};
+    for (const key of state.selProjects) {
+      const hist = state.metricsData[key] || [];
+      // most recent entry on or before t
+      let entry = null;
+      for (let i = hist.length - 1; i >= 0; i--) {
+        if (hist[i].date.getTime() <= t) { entry = hist[i]; break; }
+      }
+      if (entry) {
+        for (const [l, n] of Object.entries(entry.langs))
+          langs[l] = (langs[l] || 0) + n;
+      }
+    }
+    return { date: new Date(t), langs };
+  });
+}
+
+function activeLangs() {
+  return state.allLangs.filter(l => state.selLangs.has(l));
+}
+
+// ─── Stats ────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const snap = getSnapshot();
+  const totals = {};
+  for (const langs of Object.values(snap))
+    for (const [l, n] of Object.entries(langs))
+      totals[l] = (totals[l] || 0) + n;
+
+  const total = Object.values(totals).reduce((s, n) => s + n, 0);
+  const projN = Object.keys(snap).length;
+  const langN = Object.keys(totals).length;
+
+  document.getElementById('sTotalLoc').textContent = fmtN(total);
+  document.getElementById('sTotalLocSub').textContent = `across ${projN} project${projN !== 1 ? 's' : ''}`;
+  document.getElementById('sProjects').textContent = projN;
+  document.getElementById('sProjectsSub').textContent = `of ${state.projects.length} loaded`;
+  document.getElementById('sLangs').textContent = langN;
+  document.getElementById('sLangsSub').textContent = 'in latest snapshot';
+
+  const allDates = Object.values(state.metricsData).flatMap(h => h.map(p => p.date));
+  if (allDates.length) {
+    const min = new Date(Math.min(...allDates));
+    const max = new Date(Math.max(...allDates));
+    document.getElementById('sDateRange').textContent = fmtDate(min) + ' – ' + fmtDate(max);
+    const days = Math.round((max - min) / 864e5);
+    document.getElementById('sDateSub').textContent = `${days} day${days !== 1 ? 's' : ''} of history`;
+  }
+}
+
+// ─── Chart rendering ──────────────────────────────────────────────────────────
+function initTabBtns() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      state.view = btn.dataset.view;
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderChart();
+    });
+  });
+  document.getElementById('dateFrom').addEventListener('change', applyDateFilter);
+  document.getElementById('dateTo').addEventListener('change', applyDateFilter);
+}
+
+function applyDateFilter() {
+  const from = document.getElementById('dateFrom').value;
+  const to   = document.getElementById('dateTo').value;
+  state.dateFrom = from ? new Date(from + 'T00:00:00') : null;
+  state.dateTo   = to   ? new Date(to   + 'T23:59:59') : null;
+  updateStats();
+  renderLangFilter();
+  renderChart();
+}
+
+function resetDatesFromData() {
+  const dates = Object.values(state.metricsData).flatMap(h => h.map(p => p.date));
+  if (!dates.length) return;
+  const min = new Date(Math.min(...dates));
+  const max = new Date(Math.max(...dates));
+  state.dateFrom = min;
+  state.dateTo   = max;
+  document.getElementById('dateFrom').value = toInput(min);
+  document.getElementById('dateTo').value   = toInput(max);
+}
+
+function resetDates() {
+  resetDatesFromData();
+  updateStats();
+  renderLangFilter();
+  renderChart();
+}
+
+function mkChart(config) {
+  if (chart) chart.destroy();
+  const canvas = document.getElementById('mainChart');
+  canvas.classList.remove('hidden');
+  document.getElementById('emptyState').classList.add('hidden');
+  chart = new Chart(canvas.getContext('2d'), config);
+}
+
+function showEmpty() {
+  if (chart) { chart.destroy(); chart = null; }
+  document.getElementById('mainChart').classList.add('hidden');
+  document.getElementById('emptyState').classList.remove('hidden');
+}
+
+const AXIS_STYLE = {
+  grid: { color: 'rgba(46,50,72,0.8)' },
+  ticks: { color: '#8892a4' },
+};
+
+const LEGEND_STYLE = {
+  position: 'top',
+  labels: { color: '#e2e8f0', usePointStyle: true, pointStyleWidth: 10, padding: 14, font: { size: 12 } }
+};
+
+function renderChart() {
+  const langs = activeLangs();
+  if (!langs.length || !state.selProjects.size) { showEmpty(); return; }
+  if (state.view === 'timeline')     return renderTimeline(langs);
+  if (state.view === 'distribution') return renderDistribution(langs);
+  if (state.view === 'comparison')   return renderComparison(langs);
+}
+
+function renderTimeline(langs) {
+  const series = getTimeSeries();
+  if (!series.length) { showEmpty(); return; }
+
+  const datasets = langs.map((lang, idx) => {
+    const color = langColor(lang, idx);
+    return {
+      label: lang,
+      data: series.map(pt => ({ x: pt.date, y: pt.langs[lang] || 0 })),
+      backgroundColor: color + 'a0',
+      borderColor: color,
+      borderWidth: 1.5,
+      fill: true,
+      tension: 0.35,
+      pointRadius: series.length > 80 ? 0 : 3,
+      pointHoverRadius: 5,
+    };
+  });
+
+  const totalAtLast = langs.reduce((s, l) => s + (series[series.length - 1]?.langs[l] || 0), 0);
+  document.getElementById('chartTitle').textContent =
+    `Latest total: ${fmtN(totalAtLast)} LOC across ${state.selProjects.size} project${state.selProjects.size !== 1 ? 's' : ''}`;
+
+  mkChart({
+    type: 'line',
+    data: { datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          type: 'time',
+          time: { unit: guessUnit(series) },
+          ...AXIS_STYLE,
+          ticks: { ...AXIS_STYLE.ticks, maxTicksLimit: 8 },
+        },
+        y: {
+          stacked: true,
+          ...AXIS_STYLE,
+          ticks: { ...AXIS_STYLE.ticks, callback: fmtK },
+          title: { display: true, text: 'Lines of Code', color: '#8892a4', font: { size: 11 } },
+        }
+      },
+      plugins: {
+        legend: LEGEND_STYLE,
+        tooltip: {
+          callbacks: {
+            label: ctx => `  ${ctx.dataset.label}: ${fmtN(ctx.raw.y)}`,
+            footer: items => `  Total: ${fmtN(items.reduce((s, i) => s + i.raw.y, 0))}`,
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderDistribution(langs) {
+  const snap = getSnapshot();
+  const totals = {};
+  for (const projLangs of Object.values(snap))
+    for (const [l, n] of Object.entries(projLangs))
+      if (langs.includes(l)) totals[l] = (totals[l] || 0) + n;
+
+  const sorted = langs.filter(l => totals[l]).sort((a, b) => totals[b] - totals[a]);
+  if (!sorted.length) { showEmpty(); return; }
+
+  const total = sorted.reduce((s, l) => s + totals[l], 0);
+  document.getElementById('chartTitle').textContent = `Total: ${fmtN(total)} LOC`;
+
+  mkChart({
+    type: 'bar',
+    data: {
+      labels: sorted,
+      datasets: [{
+        label: 'Lines of Code',
+        data: sorted.map(l => totals[l]),
+        backgroundColor: sorted.map((l, i) => langColor(l, i) + 'bb'),
+        borderColor: sorted.map((l, i) => langColor(l, i)),
+        borderWidth: 1.5,
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: {
+          label: ctx => `  ${fmtN(ctx.raw)} LOC`,
+          afterLabel: ctx => `  ${((ctx.raw / total) * 100).toFixed(1)}% of total`,
+        }}
+      },
+      scales: {
+        x: { ...AXIS_STYLE, ticks: { ...AXIS_STYLE.ticks } },
+        y: {
+          ...AXIS_STYLE,
+          ticks: { ...AXIS_STYLE.ticks, callback: fmtK },
+          title: { display: true, text: 'Lines of Code', color: '#8892a4', font: { size: 11 } },
+        }
+      }
+    }
+  });
+}
+
+function renderComparison(langs) {
+  const snap = getSnapshot();
+  const projKeys = [...state.selProjects].filter(k => snap[k]);
+  if (!projKeys.length) { showEmpty(); return; }
+
+  const projNames = projKeys.map(k => {
+    const found = state.projects.find(p => p.key === k);
+    const n = found?.name || k;
+    return n.length > 22 ? n.slice(0, 20) + '…' : n;
+  });
+
+  const datasets = langs.map((lang, idx) => ({
+    label: lang,
+    data: projKeys.map(k => snap[k]?.[lang] || 0),
+    backgroundColor: langColor(lang, idx) + 'bb',
+    borderColor: langColor(lang, idx),
+    borderWidth: 1.5,
+    borderRadius: 3,
+  }));
+
+  document.getElementById('chartTitle').textContent =
+    `${projKeys.length} project${projKeys.length !== 1 ? 's' : ''} compared`;
+
+  mkChart({
+    type: 'bar',
+    data: { labels: projNames, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: { stacked: true, ...AXIS_STYLE, ticks: { ...AXIS_STYLE.ticks, maxRotation: 40 } },
+        y: {
+          stacked: true, ...AXIS_STYLE,
+          ticks: { ...AXIS_STYLE.ticks, callback: fmtK },
+          title: { display: true, text: 'Lines of Code', color: '#8892a4', font: { size: 11 } },
+        }
+      },
+      plugins: {
+        legend: LEGEND_STYLE,
+        tooltip: {
+          callbacks: {
+            label: ctx => `  ${ctx.dataset.label}: ${fmtN(ctx.raw)}`,
+            footer: items => `  Total: ${fmtN(items.reduce((s, i) => s + i.raw, 0))}`,
+          }
+        }
+      }
+    }
+  });
+}
+
+function guessUnit(series) {
+  if (series.length < 2) return 'month';
+  const span = series[series.length - 1].date - series[0].date;
+  const days = span / 864e5;
+  if (days < 45)  return 'day';
+  if (days < 600) return 'month';
+  return 'year';
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+initTabBtns();
+</script>
+</body>
+</html>
