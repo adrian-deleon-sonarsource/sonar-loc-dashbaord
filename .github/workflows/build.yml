@@ -38,4 +38,4 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: https://sc-staging.io
-        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=adrian-deleon-sonarsource_adrian-deleon-sonarsource_sonar-loc-dashbaord_ca9ab1e1-9f24-43a2-b70e-1e054261f2c9 -Dsonar.projectName='sonar-loc-dashbaord'
+        run: mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.organization=adrian-deleon-sonarsource -Dsonar.projectKey=adrian-deleon-sonarsource_adrian-deleon-sonarsource_sonar-loc-dashbaord_ca9ab1e1-9f24-43a2-b70e-1e054261f2c9 -Dsonar.projectName='sonar-loc-dashbaord'
