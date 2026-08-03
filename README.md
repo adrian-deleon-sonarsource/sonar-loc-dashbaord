@@ -1,6 +1,6 @@
 # SonarQube LOC Dashboard
 
-An interactive Lines-of-Code history dashboard for SonarQube that visualizes how your codebase grows and shrinks over time, across projects and languages.
+An interactive Lines-of-Code history dashboard for SonarQube that tracks how LOC evolves across projects and languages over time.
 
 - **SonarQube Plugin (JAR)** — embedded directly in SonarQube as a page extension
 
