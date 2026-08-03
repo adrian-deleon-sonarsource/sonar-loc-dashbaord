@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fake Dashboard</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f4f6f8;
+      color: #333;
+    }
+
+    header {
+      background-color: #1e5f99;
+      color: white;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    header h1 {
+      font-size: 1.4rem;
+    }
+
+    nav {
+      display: flex;
+      gap: 16px;
+    }
+
+    nav a {
+      color: white;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+
+    nav a:hover {
+      text-decoration: underline;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      text-align: center;
+    }
+
+    .stat-card .label {
+      font-size: 0.8rem;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+      font-size: 2rem;
+      font-weight: bold;
+      color: #1e5f99;
+    }
+
+    .stat-card .delta {
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    .delta.up {
+      color: #2e7d32;
+    }
+
+    .delta.down {
+      color: #c62828;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: bold;
+      margin-bottom: 16px;
+      color: #444;
+    }
+
+    .chart-placeholder {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+      margin-bottom: 32px;
+      height: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
+      font-size: 0.9rem;
+      border: 2px dashed #ddd;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    thead {
+      background-color: #1e5f99;
+      color: white;
+    }
+
+    thead th {
+      padding: 12px 16px;
+      text-align: left;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+    }
+
+    tbody tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+
+    tbody td {
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      border-bottom: 1px solid #eee;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+
+    .badge.green {
+      background-color: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .badge.red {
+      background-color: #ffebee;
+      color: #c62828;
+    }
+
+    .badge.yellow {
+      background-color: #fff8e1;
+      color: #f57f17;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>LOC Dashboard</h1>
+    <nav>
+      <a href="#">Overview</a>
+      <a href="#">Projects</a>
+      <a href="#">Reports</a>
+      <a href="#">Settings</a>
+    </nav>
+  </header>
+
+  <div class="container">
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="label">Total LOC</div>
+        <div class="value">142,300</div>
+        <div class="delta up">+2.4% this week</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Active Projects</div>
+        <div class="value">18</div>
+        <div class="delta up">+1 new</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Issues Found</div>
+        <div class="value">374</div>
+        <div class="delta down">+12 since last scan</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Coverage</div>
+        <div class="value">67%</div>
+        <div class="delta down">-3% this week</div>
+      </div>
+    </div>
+
+    <div class="section-title">LOC Over Time</div>
+    <div class="chart-placeholder">[ Chart placeholder — integrate Chart.js or similar here ]</div>
+
+    <div class="section-title">Project Breakdown</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Language</th>
+          <th>LOC</th>
+          <th>Delta</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>sonar-loc-dashboard</td>
+          <td>Java / JS</td>
+          <td>14,820</td>
+          <td>+340</td>
+          <td><span class="badge green">Passing</span></td>
+        </tr>
+        <tr>
+          <td>auth-service</td>
+          <td>Java</td>
+          <td>32,100</td>
+          <td>-120</td>
+          <td><span class="badge green">Passing</span></td>
+        </tr>
+        <tr>
+          <td>data-pipeline</td>
+          <td>Python</td>
+          <td>18,450</td>
+          <td>+890</td>
+          <td><span class="badge yellow">Warning</span></td>
+        </tr>
+        <tr>
+          <td>legacy-api</td>
+          <td>Java</td>
+          <td>54,300</td>
+          <td>+0</td>
+          <td><span class="badge red">Failing</span></td>
+        </tr>
+        <tr>
+          <td>frontend-app</td>
+          <td>TypeScript</td>
+          <td>22,630</td>
+          <td>+1,240</td>
+          <td><span class="badge green">Passing</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+  </div>
+
+  <footer>
+    &copy; 2026 SonarSource &mdash; LOC Dashboard &mdash; Fake Data Only
+  </footer>
+
+</body>
+</html>
